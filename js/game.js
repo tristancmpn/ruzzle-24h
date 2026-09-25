@@ -48,9 +48,12 @@ function mulberry32(a) {
   };
 }
 
-// Meme date => meme grille, sans serveur
-export function makeGrid(key) {
-  const rnd = mulberry32(hash("ruzzle24h-" + key));
+// Nouvelles grilles "choisies" a partir de cette date (avant : tirage simple, inchange)
+const V2_START = "2026-09-26";
+const CANDIDATES = 40;
+const TARGET_MIN = 100, TARGET_MAX = 200; // mots courants a trouver
+
+function randomGrid(rnd, key) {
   const pick = () => BAG[Math.floor(rnd() * BAG.length)];
   let letters;
   for (;;) {
@@ -68,6 +71,30 @@ export function makeGrid(key) {
     bonus[i] = b;
   }
   return { key, letters, bonus };
+}
+
+// Meme date => meme grille, sans serveur. Necessite le dictionnaire charge.
+export function makeGrid(key) {
+  const rnd = mulberry32(hash("ruzzle24h-" + key));
+  if (key < V2_START) return randomGrid(rnd, key);
+
+  // On tire plusieurs grilles et on garde la plus riche dans la fourchette visee
+  let best = null, bestScore = -Infinity;
+  for (let k = 0; k < CANDIDATES; k++) {
+    const grid = randomGrid(rnd, key);
+    grid.solution = solve(grid);
+    const common = [...grid.solution.keys()].filter(isCommon);
+    const inRange = common.length >= TARGET_MIN && common.length <= TARGET_MAX;
+    const longWords = common.filter((w) => w.length >= 6).length;
+    const score = inRange ? 1000 + longWords : -Math.abs(common.length - (TARGET_MIN + TARGET_MAX) / 2);
+    if (score > bestScore) { best = grid; bestScore = score; }
+  }
+  return best;
+}
+
+// Solution de la grille (calculee une seule fois)
+export function solutionOf(grid) {
+  return grid.solution || (grid.solution = solve(grid));
 }
 
 export function neighbors(i) {
@@ -105,8 +132,18 @@ let dict = null;
 export async function loadDictionary() {
   if (dict) return dict;
   const txt = await (await fetch("words.txt")).text();
-  const words = txt.split("\n");
-  dict = { words, set: new Set(words) };
+  // Une ligne par mot, trie ; suffixe "*" = mot courant (les autres sont des mots bonus)
+  const words = [], common = new Set();
+  for (const line of txt.split("\n")) {
+    if (line.endsWith("*")) {
+      const w = line.slice(0, -1);
+      words.push(w);
+      common.add(w);
+    } else if (line) {
+      words.push(line);
+    }
+  }
+  dict = { words, set: new Set(words), common };
   return dict;
 }
 
@@ -122,6 +159,10 @@ function hasPrefix(words, p) {
 
 export function isWord(w) {
   return w.length >= 2 && dict.set.has(w);
+}
+
+export function isCommon(w) {
+  return dict.common.has(w);
 }
 
 // Tous les mots de la grille, avec le meilleur score possible pour chacun
@@ -146,10 +187,16 @@ export function solve(grid) {
   return found;
 }
 
-// Mot(s) en or : ceux qui rapportent le plus de points dans la grille
+// Mot(s) en or : les mots courants qui rapportent le plus de points dans la grille
 export function goldWords(solution) {
-  const best = Math.max(0, ...solution.values());
-  return new Set([...solution].filter(([, p]) => p === best).map(([w]) => w));
+  const common = [...solution].filter(([w]) => isCommon(w));
+  const best = Math.max(0, ...common.map(([, p]) => p));
+  return new Set(common.filter(([, p]) => p === best).map(([w]) => w));
+}
+
+// Nombre de mots courants trouves (les mots bonus ne comptent pas dans "x / y mots")
+export function foundCommon(progress) {
+  return Object.keys(progress.found).filter(isCommon).length;
 }
 
 // Progression sauvegardee sur l'appareil

@@ -1,6 +1,6 @@
 import {
   VALUES, dateKey, yesterdayKey, makeGrid, isAdjacent, scorePath,
-  loadDictionary, isWord, solve, goldWords, loadProgress, saveProgress, totalScore,
+  loadDictionary, isWord, isCommon, solutionOf, goldWords, foundCommon, loadProgress, saveProgress, totalScore,
 } from "./game.js";
 import * as sound from "./sound.js";
 import * as online from "./online.js";
@@ -30,28 +30,35 @@ async function setupDay() {
   await loadDictionary();
   state.key = dateKey();
   state.grid = makeGrid(state.key);
-  state.solution = solve(state.grid);
+  state.solution = solutionOf(state.grid);
   state.gold = goldWords(state.solution);
+  state.total = [...state.solution.keys()].filter(isCommon).length;
   state.progress = loadProgress(state.key);
-  state.progress.total = state.solution.size;
+  state.progress.total = state.total;
   renderBoard($("board"), state.grid);
   renderHome();
   renderStats();
 }
 
+function bonusCount(progress) {
+  return Object.keys(progress.found).length - foundCommon(progress);
+}
+
 function renderHome() {
-  const found = Object.keys(state.progress.found).length;
-  const total = state.solution.size;
+  const found = foundCommon(state.progress);
+  const total = state.total;
+  const bonus = bonusCount(state.progress);
   const date = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
   $("home-date").textContent = date[0].toUpperCase() + date.slice(1);
-  $("home-count").textContent = `${found} / ${total} mots`;
+  $("home-count").textContent = `${found} / ${total} mots` + (bonus ? ` · +${bonus} bonus` : "");
   $("home-score").textContent = `${totalScore(state.progress)} pts`;
   $("home-bar").style.width = total ? `${(100 * found) / total}%` : "0";
   $("btn-play").textContent = found === total ? "Grille terminée !" : found ? "Continuer" : "Jouer";
 }
 
 function renderStats() {
-  $("g-count").textContent = `${Object.keys(state.progress.found).length} / ${state.solution.size}`;
+  const bonus = bonusCount(state.progress);
+  $("g-count").textContent = `${foundCommon(state.progress)} / ${state.total}` + (bonus ? ` mots · +${bonus} bonus` : " mots");
   $("g-score").textContent = totalScore(state.progress);
 }
 
@@ -160,7 +167,8 @@ let flashTimer = null;
 
 function clearFlash() {
   clearTimeout(flashTimer);
-  board.querySelectorAll(".cell").forEach((c) => c.classList.remove("sel", "flash-ok", "flash-dup", "flash-bad", "flash-gold"));
+  board.querySelectorAll(".cell").forEach((c) =>
+    c.classList.remove("sel", "flash-ok", "flash-dup", "flash-bad", "flash-gold", "flash-bonus"));
   $("trail-line").setAttribute("points", "");
   $("g-word").className = "word";
 }
@@ -181,7 +189,7 @@ function endDrag() {
   } else if (state.progress.found[w] !== undefined) {
     result = "dup";
   } else {
-    result = state.gold.has(w) ? "gold" : "ok";
+    result = state.gold.has(w) ? "gold" : isCommon(w) ? "ok" : "bonus";
     state.progress.found[w] = scorePath(state.grid, path);
     saveProgress(state.key, state.progress);
     renderStats();
@@ -195,13 +203,13 @@ function endDrag() {
   });
   const el = $("g-word");
   el.className = "word show " + result;
-  el.innerHTML = (result === "gold" ? CROWN : "") + w.toUpperCase() +
-    (result === "ok" || result === "gold" ? `<span class="pts">+${state.progress.found[w]}</span>` : "");
+  const gained = result === "ok" || result === "gold" || result === "bonus";
+  el.innerHTML = (result === "gold" ? CROWN : "") + (result === "bonus" ? `<span class="tag">BONUS</span>` : "") +
+    w.toUpperCase() + (gained ? `<span class="pts">+${state.progress.found[w]}</span>` : "");
 
-  flashTimer = setTimeout(clearFlash, result === "gold" ? 1600 : 700);
+  flashTimer = setTimeout(clearFlash, result === "gold" ? 1600 : result === "bonus" ? 1000 : 700);
 
-  const complete = result !== "bad" && result !== "dup" &&
-    Object.keys(state.progress.found).length === state.solution.size;
+  const complete = (result === "ok" || result === "gold") && foundCommon(state.progress) === state.total;
   if (complete) {
     sound.win();
     toast("Bravo ! Tu as trouvé tous les mots !", 4000);
@@ -209,7 +217,7 @@ function endDrag() {
     sound.gold();
     toast("Mot en or ! Le meilleur mot de la grille", 2500);
   } else {
-    ({ ok: sound.good, dup: sound.duplicate, bad: sound.bad })[result]();
+    ({ ok: sound.good, bonus: sound.bonus, dup: sound.duplicate, bad: sound.bad })[result]();
   }
 }
 
@@ -236,7 +244,8 @@ function renderWordList(el, words, foundSet, goldSet) {
       const chips = groups.get(len)
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([w, p]) => {
-          const cls = (foundSet && foundSet.has(w) ? " found" : "") + (goldSet.has(w) ? " gold" : "");
+          const cls = (foundSet && foundSet.has(w) ? " found" : "") +
+            (goldSet.has(w) ? " gold" : isCommon(w) ? "" : " bonus");
           return `<span class="chip${cls}">${goldSet.has(w) ? CROWN : ""}${w.toUpperCase()}<small>${p}</small></span>`;
         })
         .join("");
@@ -247,7 +256,8 @@ function renderWordList(el, words, foundSet, goldSet) {
 
 function openWords() {
   const found = Object.entries(state.progress.found);
-  $("sheet-title").textContent = `Mes mots (${found.length})`;
+  const bonus = bonusCount(state.progress);
+  $("sheet-title").textContent = `Mes mots (${found.length - bonus}${bonus ? " + " + bonus + " bonus" : ""})`;
   renderWordList($("sheet-list"), found, null, state.gold);
   $("sheet").hidden = false;
 }
@@ -255,12 +265,15 @@ function openWords() {
 function openYesterday() {
   const key = yesterdayKey();
   const grid = makeGrid(key);
-  const solution = solve(grid);
+  const solution = solutionOf(grid);
   const progress = loadProgress(key);
   const foundSet = new Set(Object.keys(progress.found));
+  const total = [...solution.keys()].filter(isCommon).length;
+  const bonus = bonusCount(progress);
   renderBoard($("y-board"), grid);
   $("y-summary").textContent =
-    `Tu as trouvé ${foundSet.size} / ${solution.size} mots · ${totalScore(progress)} pts`;
+    `Tu as trouvé ${foundCommon(progress)} / ${total} mots` + (bonus ? ` + ${bonus} bonus` : "") +
+    ` · ${totalScore(progress)} pts`;
   renderWordList($("y-list"), [...solution.entries()], foundSet, goldWords(solution));
   show("yesterday");
 }
@@ -269,8 +282,8 @@ function openYesterday() {
 let syncTimer = null;
 
 function syncDay(key, progress) {
-  const words = Object.keys(progress.found).length;
-  if (!words) return Promise.resolve();
+  if (!Object.keys(progress.found).length) return Promise.resolve();
+  const words = foundCommon(progress);
   return online.submitScore(key, totalScore(progress), words, progress.total || 0).catch(() => {});
 }
 

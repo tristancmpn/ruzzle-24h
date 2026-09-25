@@ -69,6 +69,15 @@ export function good() {
   });
 }
 
+// Mot bonus : "pling" plus aigu avec un petit scintillement
+export function bonus() {
+  play(() => {
+    bell(1568, 0, 0.3);
+    bell(2349, 0.07, 0.3);
+    bell(3136, 0.14, 0.45, 0.15);
+  });
+}
+
 // Deja trouve : "tock" neutre
 export function duplicate() {
   play(() => tone(700, 0, 0.12, { type: "triangle", vol: 0.22, slideTo: 620 }));
