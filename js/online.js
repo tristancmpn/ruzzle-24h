@@ -1,8 +1,8 @@
 // Classement en ligne (Supabase). Tout passe par des fonctions SQL (voir supabase/schema.sql).
 
 // Cle publique "anon" : faite pour etre dans le code client, elle ne donne acces qu'aux fonctions.
-export const SUPABASE_URL = "";
-export const SUPABASE_KEY = "";
+export const SUPABASE_URL = "https://uokbamrgdibgdlbmjhvv.supabase.co";
+export const SUPABASE_KEY = "sb_publishable_Moe7kxoEfDogTaGPAwVhAQ_i9k3Ym37";
 
 export const configured = () => Boolean(SUPABASE_URL && SUPABASE_KEY);
 
