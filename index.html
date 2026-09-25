@@ -42,6 +42,7 @@
     </div>
 
     <button class="btn btn-primary" id="btn-play">Jouer</button>
+    <button class="btn" id="btn-social">Classement <span class="badge" id="home-badge" hidden></span></button>
     <button class="btn" id="btn-yesterday">Solution d'hier</button>
     <button class="btn btn-link" id="btn-rules">Comment jouer</button>
   </section>
@@ -84,6 +85,98 @@
     <div class="board board-small" id="y-board"></div>
     <div class="legend"><span class="dot dot-found"></span>Trouvé <span class="dot dot-missed"></span>Manqué</div>
     <div class="word-list" id="y-list"></div>
+  </section>
+
+  <!-- Classement -->
+  <section id="social" class="view">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-back3" aria-label="Retour">‹</button>
+      <div class="topbar-title">Classement</div>
+      <div class="icon-btn-spacer"></div>
+    </header>
+
+    <div class="panel-col" id="s-off" hidden>
+      <p class="empty">Le classement n'est pas encore activé.</p>
+    </div>
+
+    <div class="panel-col" id="s-setup" hidden>
+      <div class="card">
+        <div class="card-title">Crée ton profil</div>
+        <p class="hint">Choisis un pseudo que tes amis reconnaîtront.</p>
+        <input class="field" id="s-name" maxlength="20" placeholder="Pseudo" autocomplete="off">
+        <button class="btn btn-primary btn-small" id="s-create">Créer mon profil</button>
+        <p class="msg" id="s-create-msg"></p>
+      </div>
+      <div class="card">
+        <div class="card-title">J'ai déjà un profil</div>
+        <p class="hint">Saisis ton code de récupération (visible dans ton profil sur l'ancien appareil).</p>
+        <input class="field code" id="s-secret" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters">
+        <button class="btn btn-small" id="s-restore">Récupérer</button>
+        <p class="msg" id="s-restore-msg"></p>
+      </div>
+    </div>
+
+    <div class="panel-col" id="s-main" hidden>
+      <div class="card">
+        <div class="card-title">Aujourd'hui</div>
+        <div class="board-list" id="s-board"></div>
+      </div>
+
+      <div class="card" id="s-requests" hidden>
+        <div class="card-title">Demandes d'amis</div>
+        <div id="s-incoming"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Ajouter un ami</div>
+        <p class="hint">Demande-lui son code ami et saisis-le ici.</p>
+        <div class="row">
+          <input class="field code" id="s-code" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters">
+          <button class="btn btn-small btn-primary" id="s-add">Envoyer</button>
+        </div>
+        <p class="msg" id="s-add-msg"></p>
+        <p class="hint" id="s-outgoing"></p>
+      </div>
+
+      <div class="card mycode">
+        <div class="hint">Mon code ami</div>
+        <div class="big-code" id="s-mycode">------</div>
+      </div>
+
+      <button class="btn" id="s-me">Mon profil</button>
+    </div>
+  </section>
+
+  <!-- Profil -->
+  <section id="player" class="view">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-back4" aria-label="Retour">‹</button>
+      <div class="topbar-title" id="p-name"></div>
+      <div class="icon-btn-spacer"></div>
+    </header>
+    <div class="panel-col">
+      <div class="card">
+        <div class="card-title">Aujourd'hui</div>
+        <div class="kpis" id="p-today"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">7 derniers jours</div>
+        <div class="kpis" id="p-week-kpis"></div>
+        <div class="week" id="p-week"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Depuis le début</div>
+        <div class="kpis" id="p-all"></div>
+      </div>
+      <div class="card" id="p-mine" hidden>
+        <div class="hint">Mon code ami</div>
+        <div class="big-code" id="p-code"></div>
+        <div class="hint" style="margin-top:14px">Code de récupération (à garder pour changer de téléphone, ne le donne à personne)</div>
+        <button class="reveal" id="p-secret">Afficher</button>
+        <button class="btn btn-small" id="p-rename">Changer de pseudo</button>
+      </div>
+      <button class="btn btn-danger" id="p-remove" hidden>Retirer des amis</button>
+    </div>
   </section>
 
   <!-- Liste des mots trouves -->

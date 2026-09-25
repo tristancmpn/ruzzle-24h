@@ -3,6 +3,8 @@ import {
   loadDictionary, isWord, solve, loadProgress, saveProgress, totalScore,
 } from "./game.js";
 import * as sound from "./sound.js";
+import * as online from "./online.js";
+import { initSocial, refreshBadge } from "./social.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,6 +29,7 @@ async function setupDay() {
   state.grid = makeGrid(state.key);
   state.solution = solve(state.grid);
   state.progress = loadProgress(state.key);
+  state.progress.total = state.solution.size;
   renderBoard($("board"), state.grid);
   renderHome();
   renderStats();
@@ -178,6 +181,7 @@ function endDrag() {
     state.progress.found[w] = scorePath(state.grid, path);
     saveProgress(state.key, state.progress);
     renderStats();
+    scheduleSync();
   }
 
   const cells = board.querySelectorAll(".cell");
@@ -249,6 +253,35 @@ function openYesterday() {
   show("yesterday");
 }
 
+// ---------- Envoi des scores au classement ----------
+let syncTimer = null;
+
+function syncDay(key, progress) {
+  const words = Object.keys(progress.found).length;
+  if (!words) return Promise.resolve();
+  return online.submitScore(key, totalScore(progress), words, progress.total || 0).catch(() => {});
+}
+
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncDay(state.key, state.progress), 1500);
+}
+
+// Envoie aussi les jours deja joues sur cet appareil
+async function syncAll() {
+  if (!online.configured() || !online.getProfile()) return;
+  const keys = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (/^r24:\d{4}-\d{2}-\d{2}$/.test(k)) keys.push(k.slice(4));
+    }
+  } catch {}
+  for (const key of keys) {
+    await syncDay(key, key === state.key ? state.progress : loadProgress(key));
+  }
+}
+
 // ---------- Divers ----------
 let toastTimer = null;
 function toast(msg, ms = 2000) {
@@ -282,11 +315,15 @@ document.querySelectorAll(".sheet").forEach((s) =>
   s.addEventListener("click", (e) => { if (e.target === s) s.hidden = true; }));
 
 // Revenir dans l'app apres minuit => nouvelle grille
-document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { tick(); refreshBadge(); }
+});
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
+initSocial({ show, toast, onProfile: syncAll });
+
 $("home-count").textContent = "Chargement…";
-setupDay().then(tick);
+setupDay().then(() => { tick(); syncAll(); });
 setInterval(tick, 1000);
