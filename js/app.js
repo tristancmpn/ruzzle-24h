@@ -98,11 +98,6 @@ function currentWord() {
   return state.path.map((i) => state.grid.letters[i]).join("");
 }
 
-function wordStatus(w) {
-  if (!isWord(w)) return "";
-  return state.progress.found[w] !== undefined ? "dup" : "ok";
-}
-
 function updateTrace() {
   const cells = board.querySelectorAll(".cell");
   cells.forEach((c, i) => c.classList.toggle("sel", state.path.includes(i)));
@@ -115,9 +110,9 @@ function updateTrace() {
 
   const w = currentWord();
   const el = $("g-word");
-  const status = wordStatus(w);
-  el.className = "word" + (w ? " show" : "") + (status ? " " + status : "");
-  el.innerHTML = w.toUpperCase() + (status ? `<span class="pts">${scorePath(state.grid, state.path)}</span>` : "");
+  // Pas d'indice pendant le trace : le verdict tombe au relachement
+  el.className = "word" + (w ? " show" : "");
+  el.textContent = w.toUpperCase();
 }
 
 function startDrag(e) {
@@ -192,7 +187,8 @@ function endDrag() {
   });
   const el = $("g-word");
   el.className = "word show " + result;
-  if (result === "bad") el.textContent = w.toUpperCase();
+  el.innerHTML = w.toUpperCase() +
+    (result === "ok" ? `<span class="pts">+${state.progress.found[w]}</span>` : "");
 
   flashTimer = setTimeout(clearFlash, 700);
 
