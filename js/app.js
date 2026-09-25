@@ -2,6 +2,7 @@ import {
   VALUES, dateKey, yesterdayKey, makeGrid, isAdjacent, scorePath,
   loadDictionary, isWord, solve, loadProgress, saveProgress, totalScore,
 } from "./game.js";
+import * as sound from "./sound.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -121,6 +122,7 @@ function updateTrace() {
 
 function startDrag(e) {
   if (!state.grid) return;
+  sound.unlock();
   boardRect = board.getBoundingClientRect();
   cellRects = [...board.querySelectorAll(".cell")].map((c) => c.getBoundingClientRect());
   $("trail").setAttribute("viewBox", `0 0 ${boardRect.width} ${boardRect.height}`);
@@ -130,6 +132,7 @@ function startDrag(e) {
   try { board.setPointerCapture(e.pointerId); } catch {}
   state.dragging = true;
   state.path = [i];
+  sound.letter(1);
   updateTrace();
 }
 
@@ -144,6 +147,7 @@ function moveDrag(e) {
     path.pop(); // retour en arriere
   } else if (!path.includes(i) && isAdjacent(last, i)) {
     path.push(i);
+    sound.letter(path.length);
   } else {
     return;
   }
@@ -193,7 +197,10 @@ function endDrag() {
   flashTimer = setTimeout(clearFlash, 700);
 
   if (result === "ok" && Object.keys(state.progress.found).length === state.solution.size) {
+    sound.win();
     toast("Bravo ! Tu as trouvé tous les mots !", 4000);
+  } else {
+    ({ ok: sound.good, dup: sound.duplicate, bad: sound.bad })[result]();
   }
 }
 
@@ -261,6 +268,16 @@ $("btn-back").addEventListener("click", () => { renderHome(); show("home"); });
 $("btn-back2").addEventListener("click", () => show("home"));
 $("btn-words").addEventListener("click", openWords);
 $("btn-yesterday").addEventListener("click", () => state.grid && openYesterday());
+function renderSoundBtn() {
+  $("btn-sound").textContent = sound.isEnabled() ? "🔊 Son activé" : "🔇 Son coupé";
+}
+$("btn-sound").addEventListener("click", () => {
+  sound.unlock();
+  sound.setEnabled(!sound.isEnabled());
+  renderSoundBtn();
+  sound.good();
+});
+renderSoundBtn();
 $("btn-rules").addEventListener("click", () => ($("rules").hidden = false));
 $("sheet-close").addEventListener("click", () => ($("sheet").hidden = true));
 $("rules-close").addEventListener("click", () => ($("rules").hidden = true));

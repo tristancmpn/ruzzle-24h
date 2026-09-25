@@ -1,7 +1,7 @@
 // Cache hors-ligne. Incrementer VERSION a chaque mise en ligne.
-const VERSION = "r24-v1";
+const VERSION = "r24-v2";
 const FILES = [
-  "./", "index.html", "css/style.css", "js/app.js", "js/game.js", "words.txt",
+  "./", "index.html", "css/style.css", "js/app.js", "js/game.js", "js/sound.js", "words.txt",
   "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
 ];
 
