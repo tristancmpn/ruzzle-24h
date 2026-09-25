@@ -146,6 +146,12 @@ export function solve(grid) {
   return found;
 }
 
+// Mot(s) en or : ceux qui rapportent le plus de points dans la grille
+export function goldWords(solution) {
+  const best = Math.max(0, ...solution.values());
+  return new Set([...solution].filter(([, p]) => p === best).map(([w]) => w));
+}
+
 // Progression sauvegardee sur l'appareil
 export function loadProgress(key) {
   try {

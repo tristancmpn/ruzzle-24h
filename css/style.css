@@ -218,6 +218,25 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .board .cell.flash-dup { background: var(--dup); color: #5a4300; box-shadow: 0 5px 0 #b38e00; transform: scale(1.08); z-index: 1; }
 .board .cell.flash-bad { background: var(--bad); color: #fff; box-shadow: 0 5px 0 #a53322; transform: scale(1.08); z-index: 1; }
 
+/* Mot en or */
+.board .cell.flash-gold {
+  background: linear-gradient(180deg, #ffe066 0%, #ffbf00 100%);
+  color: #5a3d00; box-shadow: 0 5px 0 #b37f00, 0 0 18px rgba(255, 210, 60, 0.9);
+  transform: scale(1.08); z-index: 1;
+  animation: gold-pulse 0.4s ease-in-out 3 alternate;
+}
+@keyframes gold-pulse { to { transform: scale(1.15); } }
+.word.gold {
+  background: linear-gradient(180deg, #ffe066 0%, #ffbf00 100%);
+  color: #5a3d00; box-shadow: 0 4px 0 #b37f00, 0 0 24px rgba(255, 210, 60, 0.8);
+}
+.word.gold .pts { color: #8a5e00; }
+.word .crown { width: 30px; height: 30px; vertical-align: -3px; margin-right: 8px; }
+.chip .crown { width: 16px; height: 16px; vertical-align: -2px; margin-right: 4px; }
+.chip.gold { background: linear-gradient(180deg, #ffe066 0%, #ffbf00 100%); color: #5a3d00; }
+.sheet .chip.gold { background: linear-gradient(180deg, #ffe066 0%, #ffbf00 100%); }
+#y-list .chip.gold:not(.found) { opacity: 0.75; }
+
 .trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
 .trail polyline {
   fill: none;
@@ -287,6 +306,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .toast {
   position: fixed; left: 50%; top: calc(var(--safe-top) + 90px); z-index: 20;
   transform: translateX(-50%);
+  width: max-content; max-width: calc(100vw - 32px);
   background: #fff; color: var(--panel-text);
   padding: 14px 20px; border-radius: 16px;
   font-size: 18px; font-weight: 800; text-align: center;

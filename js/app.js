@@ -1,6 +1,6 @@
 import {
   VALUES, dateKey, yesterdayKey, makeGrid, isAdjacent, scorePath,
-  loadDictionary, isWord, solve, loadProgress, saveProgress, totalScore,
+  loadDictionary, isWord, solve, goldWords, loadProgress, saveProgress, totalScore,
 } from "./game.js";
 import * as sound from "./sound.js";
 import * as online from "./online.js";
@@ -8,10 +8,13 @@ import { initSocial, refreshBadge } from "./social.js";
 
 const $ = (id) => document.getElementById(id);
 
+const CROWN = `<svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5z" fill="currentColor"/><rect x="5" y="19" width="14" height="2" rx="1" fill="currentColor"/></svg>`;
+
 const state = {
   key: null,
   grid: null,
   solution: null, // Map mot -> points max
+  gold: null, // Set des mots en or
   progress: null,
   path: [],
   dragging: false,
@@ -28,6 +31,7 @@ async function setupDay() {
   state.key = dateKey();
   state.grid = makeGrid(state.key);
   state.solution = solve(state.grid);
+  state.gold = goldWords(state.solution);
   state.progress = loadProgress(state.key);
   state.progress.total = state.solution.size;
   renderBoard($("board"), state.grid);
@@ -156,7 +160,7 @@ let flashTimer = null;
 
 function clearFlash() {
   clearTimeout(flashTimer);
-  board.querySelectorAll(".cell").forEach((c) => c.classList.remove("sel", "flash-ok", "flash-dup", "flash-bad"));
+  board.querySelectorAll(".cell").forEach((c) => c.classList.remove("sel", "flash-ok", "flash-dup", "flash-bad", "flash-gold"));
   $("trail-line").setAttribute("points", "");
   $("g-word").className = "word";
 }
@@ -177,7 +181,7 @@ function endDrag() {
   } else if (state.progress.found[w] !== undefined) {
     result = "dup";
   } else {
-    result = "ok";
+    result = state.gold.has(w) ? "gold" : "ok";
     state.progress.found[w] = scorePath(state.grid, path);
     saveProgress(state.key, state.progress);
     renderStats();
@@ -191,14 +195,19 @@ function endDrag() {
   });
   const el = $("g-word");
   el.className = "word show " + result;
-  el.innerHTML = w.toUpperCase() +
-    (result === "ok" ? `<span class="pts">+${state.progress.found[w]}</span>` : "");
+  el.innerHTML = (result === "gold" ? CROWN : "") + w.toUpperCase() +
+    (result === "ok" || result === "gold" ? `<span class="pts">+${state.progress.found[w]}</span>` : "");
 
-  flashTimer = setTimeout(clearFlash, 700);
+  flashTimer = setTimeout(clearFlash, result === "gold" ? 1600 : 700);
 
-  if (result === "ok" && Object.keys(state.progress.found).length === state.solution.size) {
+  const complete = result !== "bad" && result !== "dup" &&
+    Object.keys(state.progress.found).length === state.solution.size;
+  if (complete) {
     sound.win();
     toast("Bravo ! Tu as trouvé tous les mots !", 4000);
+  } else if (result === "gold") {
+    sound.gold();
+    toast("Mot en or ! Le meilleur mot de la grille", 2500);
   } else {
     ({ ok: sound.good, dup: sound.duplicate, bad: sound.bad })[result]();
   }
@@ -210,7 +219,7 @@ board.addEventListener("pointerup", endDrag);
 board.addEventListener("pointercancel", endDrag);
 
 // ---------- Listes de mots ----------
-function renderWordList(el, words, foundSet) {
+function renderWordList(el, words, foundSet, goldSet) {
   // words : [[mot, points]], regroupes par longueur decroissante
   if (!words.length) {
     el.innerHTML = `<p class="empty">Aucun mot pour l'instant.</p>`;
@@ -226,7 +235,10 @@ function renderWordList(el, words, foundSet) {
     .map((len) => {
       const chips = groups.get(len)
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([w, p]) => `<span class="chip${foundSet && foundSet.has(w) ? " found" : ""}">${w.toUpperCase()}<small>${p}</small></span>`)
+        .map(([w, p]) => {
+          const cls = (foundSet && foundSet.has(w) ? " found" : "") + (goldSet.has(w) ? " gold" : "");
+          return `<span class="chip${cls}">${goldSet.has(w) ? CROWN : ""}${w.toUpperCase()}<small>${p}</small></span>`;
+        })
         .join("");
       return `<div class="group-title">${len} lettres</div><div class="chips">${chips}</div>`;
     })
@@ -236,7 +248,7 @@ function renderWordList(el, words, foundSet) {
 function openWords() {
   const found = Object.entries(state.progress.found);
   $("sheet-title").textContent = `Mes mots (${found.length})`;
-  renderWordList($("sheet-list"), found, null);
+  renderWordList($("sheet-list"), found, null, state.gold);
   $("sheet").hidden = false;
 }
 
@@ -249,7 +261,7 @@ function openYesterday() {
   renderBoard($("y-board"), grid);
   $("y-summary").textContent =
     `Tu as trouvé ${foundSet.size} / ${solution.size} mots · ${totalScore(progress)} pts`;
-  renderWordList($("y-list"), [...solution.entries()], foundSet);
+  renderWordList($("y-list"), [...solution.entries()], foundSet, goldWords(solution));
   show("yesterday");
 }
 

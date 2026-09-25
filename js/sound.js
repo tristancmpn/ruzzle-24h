@@ -82,6 +82,15 @@ export function bad() {
   });
 }
 
+// Mot en or : envolee scintillante puis accord
+export function gold() {
+  play(() => {
+    [1046.5, 1318.5, 1568, 2093, 2637, 3136].forEach((f, i) => bell(f, i * 0.05, 0.25, 0.16));
+    [1046.5, 1318.5, 1568].forEach((f) => bell(f, 0.38, 1.1, 0.14));
+    tone(2093, 0.38, 1.1, { type: "triangle", vol: 0.08 });
+  });
+}
+
 // Grille terminee : arpege de cloches
 export function win() {
   play(() => {
