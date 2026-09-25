@@ -328,10 +328,19 @@ document.querySelectorAll(".sheet").forEach((s) =>
 
 // Revenir dans l'app apres minuit => nouvelle grille
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) { tick(); refreshBadge(); }
+  if (!document.hidden) { tick(); refreshBadge(); if (swReg) swReg.update(); }
 });
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+// Mise a jour automatique : quand une nouvelle version prend le relais, on recharge
+// (la progression est deja sauvegardee sur l'appareil)
+let swReg = null;
+if ("serviceWorker" in navigator) {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.register("sw.js").then((r) => (swReg = r));
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (hadController) location.reload();
+  });
+}
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
 initSocial({ show, toast, onProfile: syncAll });
