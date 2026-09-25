@@ -265,7 +265,8 @@ $("btn-back2").addEventListener("click", () => show("home"));
 $("btn-words").addEventListener("click", openWords);
 $("btn-yesterday").addEventListener("click", () => state.grid && openYesterday());
 function renderSoundBtn() {
-  $("btn-sound").textContent = sound.isEnabled() ? "🔊 Son activé" : "🔇 Son coupé";
+  $("btn-sound").classList.toggle("muted", !sound.isEnabled());
+  $("btn-sound").setAttribute("aria-label", sound.isEnabled() ? "Couper le son" : "Activer le son");
 }
 $("btn-sound").addEventListener("click", () => {
   sound.unlock();

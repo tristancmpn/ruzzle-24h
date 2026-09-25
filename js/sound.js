@@ -43,33 +43,48 @@ function play(fn) {
   fn();
 }
 
-// Petit "tic" a chaque lettre, de plus en plus aigu
-export function letter(n) {
-  play(() => tone(520 * Math.pow(2, Math.min(n - 1, 12) / 12), 0, 0.09, { type: "triangle", vol: 0.2 }));
+// Cloche : fondamentale + partiels inharmoniques, attaque seche, decroissance rapide
+function bell(freq, start, dur, vol = 0.22) {
+  tone(freq, start, dur, { type: "sine", vol });
+  tone(freq * 2.76, start, dur * 0.5, { type: "sine", vol: vol * 0.35 });
+  tone(freq * 5.4, start, dur * 0.25, { type: "sine", vol: vol * 0.12 });
 }
 
+// Gamme majeure : chaque lettre ajoutee monte d'un cran
+const SCALE = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24, 26];
+
+// "Pop" a chaque lettre
+export function letter(n) {
+  play(() => {
+    const f = 440 * Math.pow(2, SCALE[Math.min(n - 1, SCALE.length - 1)] / 12);
+    tone(f * 1.6, 0, 0.07, { type: "sine", vol: 0.25, slideTo: f });
+  });
+}
+
+// Mot trouve : "pling" cristallin en deux notes
 export function good() {
   play(() => {
-    tone(660, 0, 0.12, { type: "triangle" });
-    tone(880, 0.08, 0.12, { type: "triangle" });
-    tone(1320, 0.16, 0.22, { type: "triangle" });
+    bell(1318.5, 0, 0.35);
+    bell(1975.5, 0.07, 0.5);
   });
 }
 
+// Deja trouve : "tock" neutre
 export function duplicate() {
+  play(() => tone(700, 0, 0.12, { type: "triangle", vol: 0.22, slideTo: 620 }));
+}
+
+// Mot invalide : "bonk" sourd et grave
+export function bad() {
   play(() => {
-    tone(600, 0, 0.1, { type: "sine", vol: 0.2 });
-    tone(600, 0.13, 0.1, { type: "sine", vol: 0.2 });
+    tone(190, 0, 0.22, { type: "sine", vol: 0.45, slideTo: 85 });
+    tone(120, 0, 0.18, { type: "triangle", vol: 0.2, slideTo: 60 });
   });
 }
 
-export function bad() {
-  play(() => tone(220, 0, 0.25, { type: "square", vol: 0.08, slideTo: 140 }));
-}
-
+// Grille terminee : arpege de cloches
 export function win() {
   play(() => {
-    [523, 659, 784, 1047, 784, 1047].forEach((f, i) =>
-      tone(f, i * 0.14, i === 5 ? 0.6 : 0.16, { type: "triangle", vol: 0.25 }));
+    [1046.5, 1318.5, 1568, 2093].forEach((f, i) => bell(f, i * 0.11, i === 3 ? 0.9 : 0.3));
   });
 }
