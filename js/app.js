@@ -1,0 +1,278 @@
+import {
+  VALUES, dateKey, yesterdayKey, makeGrid, isAdjacent, scorePath,
+  loadDictionary, isWord, solve, loadProgress, saveProgress, totalScore,
+} from "./game.js";
+
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  key: null,
+  grid: null,
+  solution: null, // Map mot -> points max
+  progress: null,
+  path: [],
+  dragging: false,
+};
+
+// ---------- Navigation ----------
+function show(view) {
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === view));
+}
+
+// ---------- Grille du jour ----------
+async function setupDay() {
+  await loadDictionary();
+  state.key = dateKey();
+  state.grid = makeGrid(state.key);
+  state.solution = solve(state.grid);
+  state.progress = loadProgress(state.key);
+  renderBoard($("board"), state.grid);
+  renderHome();
+  renderStats();
+}
+
+function renderHome() {
+  const found = Object.keys(state.progress.found).length;
+  const total = state.solution.size;
+  const date = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  $("home-date").textContent = date[0].toUpperCase() + date.slice(1);
+  $("home-count").textContent = `${found} / ${total} mots`;
+  $("home-score").textContent = `${totalScore(state.progress)} pts`;
+  $("home-bar").style.width = total ? `${(100 * found) / total}%` : "0";
+  $("btn-play").textContent = found === total ? "Grille terminée !" : found ? "Continuer" : "Jouer";
+}
+
+function renderStats() {
+  $("g-count").textContent = `${Object.keys(state.progress.found).length} / ${state.solution.size}`;
+  $("g-score").textContent = totalScore(state.progress);
+}
+
+function renderBoard(el, grid) {
+  el.querySelectorAll(".cell").forEach((c) => c.remove());
+  grid.letters.forEach((letter, i) => {
+    const cell = document.createElement("div");
+    cell.className = "cell" + (grid.bonus[i] ? " b-" + grid.bonus[i] : "");
+    cell.dataset.i = i;
+    cell.innerHTML =
+      `<span class="val">${VALUES[letter]}</span>${letter.toUpperCase()}` +
+      (grid.bonus[i] ? `<span class="bonus">${grid.bonus[i]}</span>` : "");
+    el.appendChild(cell);
+  });
+}
+
+// ---------- Minuteur (jusqu'a minuit) ----------
+function tick() {
+  if (state.key && dateKey() !== state.key) {
+    // Nouvelle journee : nouvelle grille
+    setupDay();
+    show("home");
+    return;
+  }
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const s = Math.max(0, Math.floor((midnight - now) / 1000));
+  const p = (n) => String(n).padStart(2, "0");
+  const txt = `${p(Math.floor(s / 3600))}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`;
+  $("home-timer").textContent = txt;
+  $("g-timer").textContent = txt;
+}
+
+// ---------- Trace du doigt ----------
+const board = $("board");
+let cellRects = [];
+let boardRect = null;
+
+function cellAt(x, y) {
+  // Zone de detection reduite au centre de la case pour faciliter les diagonales
+  for (let i = 0; i < cellRects.length; i++) {
+    const r = cellRects[i];
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (Math.hypot(x - cx, y - cy) < r.width * 0.46) return i;
+  }
+  return -1;
+}
+
+function currentWord() {
+  return state.path.map((i) => state.grid.letters[i]).join("");
+}
+
+function wordStatus(w) {
+  if (!isWord(w)) return "";
+  return state.progress.found[w] !== undefined ? "dup" : "ok";
+}
+
+function updateTrace() {
+  const cells = board.querySelectorAll(".cell");
+  cells.forEach((c, i) => c.classList.toggle("sel", state.path.includes(i)));
+
+  const pts = state.path.map((i) => {
+    const r = cellRects[i];
+    return `${r.left - boardRect.left + r.width / 2},${r.top - boardRect.top + r.height / 2}`;
+  });
+  $("trail-line").setAttribute("points", pts.join(" "));
+
+  const w = currentWord();
+  const el = $("g-word");
+  const status = wordStatus(w);
+  el.className = "word" + (w ? " show" : "") + (status ? " " + status : "");
+  el.innerHTML = w.toUpperCase() + (status ? `<span class="pts">${scorePath(state.grid, state.path)}</span>` : "");
+}
+
+function startDrag(e) {
+  if (!state.grid) return;
+  boardRect = board.getBoundingClientRect();
+  cellRects = [...board.querySelectorAll(".cell")].map((c) => c.getBoundingClientRect());
+  $("trail").setAttribute("viewBox", `0 0 ${boardRect.width} ${boardRect.height}`);
+  clearFlash();
+  const i = cellAt(e.clientX, e.clientY);
+  if (i < 0) return;
+  try { board.setPointerCapture(e.pointerId); } catch {}
+  state.dragging = true;
+  state.path = [i];
+  updateTrace();
+}
+
+function moveDrag(e) {
+  if (!state.dragging) return;
+  const i = cellAt(e.clientX, e.clientY);
+  if (i < 0) return;
+  const path = state.path;
+  const last = path[path.length - 1];
+  if (i === last) return;
+  if (path.length > 1 && i === path[path.length - 2]) {
+    path.pop(); // retour en arriere
+  } else if (!path.includes(i) && isAdjacent(last, i)) {
+    path.push(i);
+  } else {
+    return;
+  }
+  updateTrace();
+}
+
+let flashTimer = null;
+
+function clearFlash() {
+  clearTimeout(flashTimer);
+  board.querySelectorAll(".cell").forEach((c) => c.classList.remove("sel", "flash-ok", "flash-dup", "flash-bad"));
+  $("trail-line").setAttribute("points", "");
+  $("g-word").className = "word";
+}
+
+function endDrag() {
+  if (!state.dragging) return;
+  state.dragging = false;
+  const w = currentWord();
+  const path = state.path;
+  state.path = [];
+  $("trail-line").setAttribute("points", "");
+
+  if (w.length < 2) return clearFlash();
+
+  let result;
+  if (!isWord(w)) {
+    result = "bad";
+  } else if (state.progress.found[w] !== undefined) {
+    result = "dup";
+  } else {
+    result = "ok";
+    state.progress.found[w] = scorePath(state.grid, path);
+    saveProgress(state.key, state.progress);
+    renderStats();
+  }
+
+  const cells = board.querySelectorAll(".cell");
+  path.forEach((i) => {
+    cells[i].classList.remove("sel");
+    cells[i].classList.add("flash-" + result);
+  });
+  const el = $("g-word");
+  el.className = "word show " + result;
+  if (result === "bad") el.textContent = w.toUpperCase();
+
+  flashTimer = setTimeout(clearFlash, 700);
+
+  if (result === "ok" && Object.keys(state.progress.found).length === state.solution.size) {
+    toast("Bravo ! Tu as trouvé tous les mots !", 4000);
+  }
+}
+
+board.addEventListener("pointerdown", startDrag);
+board.addEventListener("pointermove", moveDrag);
+board.addEventListener("pointerup", endDrag);
+board.addEventListener("pointercancel", endDrag);
+
+// ---------- Listes de mots ----------
+function renderWordList(el, words, foundSet) {
+  // words : [[mot, points]], regroupes par longueur decroissante
+  if (!words.length) {
+    el.innerHTML = `<p class="empty">Aucun mot pour l'instant.</p>`;
+    return;
+  }
+  const groups = new Map();
+  for (const [w, p] of words) {
+    if (!groups.has(w.length)) groups.set(w.length, []);
+    groups.get(w.length).push([w, p]);
+  }
+  el.innerHTML = [...groups.keys()]
+    .sort((a, b) => b - a)
+    .map((len) => {
+      const chips = groups.get(len)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([w, p]) => `<span class="chip${foundSet && foundSet.has(w) ? " found" : ""}">${w.toUpperCase()}<small>${p}</small></span>`)
+        .join("");
+      return `<div class="group-title">${len} lettres</div><div class="chips">${chips}</div>`;
+    })
+    .join("");
+}
+
+function openWords() {
+  const found = Object.entries(state.progress.found);
+  $("sheet-title").textContent = `Mes mots (${found.length})`;
+  renderWordList($("sheet-list"), found, null);
+  $("sheet").hidden = false;
+}
+
+function openYesterday() {
+  const key = yesterdayKey();
+  const grid = makeGrid(key);
+  const solution = solve(grid);
+  const progress = loadProgress(key);
+  const foundSet = new Set(Object.keys(progress.found));
+  renderBoard($("y-board"), grid);
+  $("y-summary").textContent =
+    `Tu as trouvé ${foundSet.size} / ${solution.size} mots · ${totalScore(progress)} pts`;
+  renderWordList($("y-list"), [...solution.entries()], foundSet);
+  show("yesterday");
+}
+
+// ---------- Divers ----------
+let toastTimer = null;
+function toast(msg, ms = 2000) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), ms);
+}
+
+$("btn-play").addEventListener("click", () => state.grid && show("game"));
+$("btn-back").addEventListener("click", () => { renderHome(); show("home"); });
+$("btn-back2").addEventListener("click", () => show("home"));
+$("btn-words").addEventListener("click", openWords);
+$("btn-yesterday").addEventListener("click", () => state.grid && openYesterday());
+$("btn-rules").addEventListener("click", () => ($("rules").hidden = false));
+$("sheet-close").addEventListener("click", () => ($("sheet").hidden = true));
+$("rules-close").addEventListener("click", () => ($("rules").hidden = true));
+document.querySelectorAll(".sheet").forEach((s) =>
+  s.addEventListener("click", (e) => { if (e.target === s) s.hidden = true; }));
+
+// Revenir dans l'app apres minuit => nouvelle grille
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+
+$("home-count").textContent = "Chargement…";
+setupDay().then(tick);
+setInterval(tick, 1000);
